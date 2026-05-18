@@ -2,17 +2,17 @@
 FROM mcr.microsoft.com/dotnet/sdk:8.0 AS build
 WORKDIR /src
 
-COPY ["NeoHub/NeoHub/NeoHub.csproj", "NeoHub/NeoHub/"]
-COPY ["NeoHub/TLink/DSC.TLink.csproj", "NeoHub/TLink/"]
+COPY ["NeoHub/NeoHub.csproj", "NeoHub/"]
+COPY ["TLink/DSC.TLink.csproj", "TLink/"]
 
-RUN dotnet restore "NeoHub/NeoHub/NeoHub.csproj"
+RUN dotnet restore "NeoHub/NeoHub.csproj"
 
 COPY . .
 
 ARG GITHUB_SHA=local
 ARG GITHUB_RUN_NUMBER=0
 
-WORKDIR "/src/NeoHub/NeoHub"
+WORKDIR "/src/NeoHub"
 RUN dotnet publish "NeoHub.csproj" -c Release -o /app/publish /p:UseAppHost=false /p:GITHUB_SHA=$GITHUB_SHA /p:GITHUB_RUN_NUMBER=$GITHUB_RUN_NUMBER
 
 # Runtime stage
