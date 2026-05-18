@@ -1,19 +1,27 @@
 name: NeoHub
-version: "0.1.0"
 slug: neohub
+version: "0.1.0"
 description: NeoHub for Home Assistant
-startup: services
-boot: auto
+
+url: https://github.com/killthecloud/ha-addon-neohub
 
 arch:
   - amd64
   - aarch64
 
+startup: services
+boot: auto
+init: false
+
 ports:
   8080/tcp: 8080
+  8443/tcp: 8443
+  3072/tcp: 3072
 
 ports_description:
   8080/tcp: NeoHub Web Interface
+  8443/tcp: NeoHub HTTPS
+  3072/tcp: TLink
 
 map:
   - config:rw
