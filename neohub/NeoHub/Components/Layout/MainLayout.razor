@@ -1,0 +1,211 @@
+﻿@inherits LayoutComponentBase
+@using NeoHub.Services
+@using NeoHub.Services.Models
+@using DSC.TLink.ITv2.MediatR
+@using Microsoft.JSInterop
+@inject IPanelStateService PanelState
+@inject IITv2SessionManager SessionManager
+@inject IJSRuntime JS
+@implements IDisposable
+
+<!-- ✅ Add MudBlazor Providers -->
+<MudThemeProvider />
+<MudPopoverProvider />
+<MudDialogProvider />
+<MudSnackbarProvider />
+
+@* Exit Delay Banner - Fixed position at top, above all content *@
+@{
+    var allSessions = SessionManager.GetActiveSessions();
+    var activeDelays = allSessions
+        .SelectMany(sessionId =>
+        {
+            var session = PanelState.GetSession(sessionId);
+            if (session == null)
+                return Enumerable.Empty<(string SessionId, PartitionState Partition)>();
+
+            return session.Partitions.Values
+                .Where(p => p.ExitDelayActive && p.ExitDelayRemaining.HasValue && p.ExitDelayRemaining.Value > TimeSpan.Zero)
+                .Select(p => (SessionId: sessionId, Partition: p));
+        })
+        .OrderBy(item => item.Partition.ExitDelayRemaining)
+        .ToList();
+}
+
+@for (int i = 0; i < activeDelays.Count; i++)
+{
+    var item = activeDelays[i];
+    var partition = item.Partition;
+    var sessionId = item.SessionId;
+    var remaining = partition.ExitDelayRemaining!.Value;
+    var severity = partition.ExitDelayUrgent ? Severity.Error : Severity.Warning;
+    var icon = partition.ExitDelayUrgent ? Icons.Material.Filled.Warning : Icons.Material.Filled.Timer;
+    // Shortest delay (index 0) gets highest z-index
+    var zIndex = 9999 + (activeDelays.Count - i);
+
+    <MudAlert Severity="@severity"
+              Variant="Variant.Filled"
+              Class="exit-delay-banner"
+              Style="@($"z-index: {zIndex};")"
+              Icon="@icon">
+        <div class="exit-delay-content">
+            <MudText Typo="Typo.body2" Class="exit-delay-label">
+                <strong>P@(partition.PartitionNumber) Exit Delay</strong>
+            </MudText>
+            <MudText Typo="Typo.h4" Class="exit-delay-timer">
+                @remaining.ToString(@"mm\:ss")
+            </MudText>
+            @if (partition.ExitDelayUrgent)
+            {
+                <MudText Typo="Typo.body2" Class="exit-delay-urgent">
+                    URGENT
+                </MudText>
+            }
+        </div>
+    </MudAlert>
+}
+
+<div class="page">
+    <div class="sidebar">
+        <NavMenu />
+    </div>
+
+    <main>
+        <div class="top-row px-4">
+			<a href="https://github.com/BrianHumlicek/NeoHub" target="_blank">About</a>
+        </div>
+
+        <article class="content px-4">
+            @Body
+        </article>
+    </main>
+</div>
+
+<div id="blazor-error-ui">
+    An unhandled error has occurred.
+    <a href="" class="reload">Reload</a>
+    <a class="dismiss">🗙</a>
+</div>
+
+@code {
+    private Timer? _refreshTimer;
+    private bool _isBeeping = false;
+    private bool _wasUrgent = false;
+    private CancellationTokenSource _cts = new();
+
+    protected override void OnInitialized()
+    {
+        PanelState.PartitionStateChanged += OnPartitionStateChanged;
+
+        // Refresh UI every second for countdown and audio management
+        _refreshTimer = new Timer(_ =>
+        {
+            _ = SafeInvokeAsync(async () =>
+            {
+                var hasActiveDelay = HasActiveExitDelay();
+                await UpdateExitDelayBeepAsync(hasActiveDelay, _cts.Token);
+
+                if (hasActiveDelay && !_cts.Token.IsCancellationRequested)
+                    StateHasChanged();
+            });
+        }, null, TimeSpan.Zero, TimeSpan.FromSeconds(1));
+    }
+
+    private void OnPartitionStateChanged(object? sender, PartitionStateChangedEventArgs e)
+    {
+        _ = SafeInvokeAsync(async () =>
+        {
+            await UpdateExitDelayBeepAsync(HasActiveExitDelay(), _cts.Token);
+            if (!_cts.Token.IsCancellationRequested)
+                StateHasChanged();
+        });
+    }
+
+    private async Task SafeInvokeAsync(Func<Task> work)
+    {
+        try
+        {
+            await InvokeAsync(async () =>
+            {
+                if (_cts.IsCancellationRequested)
+                    return;
+
+                await work();
+            });
+        }
+        catch (ObjectDisposedException)
+        {
+            // Component is being torn down
+        }
+        catch (InvalidOperationException)
+        {
+            // Renderer is no longer available
+        }
+    }
+
+    private bool HasActiveExitDelay()
+    {
+        return SessionManager.GetActiveSessions()
+            .SelectMany(sessionId =>
+            {
+                var session = PanelState.GetSession(sessionId);
+                return session?.Partitions.Values ?? Enumerable.Empty<PartitionState>();
+            })
+            .Any(p => p.ExitDelayActive && p.ExitDelayRemaining.HasValue && p.ExitDelayRemaining.Value > TimeSpan.Zero);
+    }
+
+    private async Task UpdateExitDelayBeepAsync(bool hasActiveDelay, CancellationToken token)
+    {
+        if (token.IsCancellationRequested) return;
+
+        var audiblePartitions = hasActiveDelay
+            ? SessionManager.GetActiveSessions()
+                .SelectMany(sessionId =>
+                {
+                    var session = PanelState.GetSession(sessionId);
+                    return session?.Partitions.Values ?? Enumerable.Empty<PartitionState>();
+                })
+                .Where(p => p.ExitDelayActive && p.ExitDelayAudible && p.ExitDelayRemaining.HasValue && p.ExitDelayRemaining.Value > TimeSpan.Zero)
+                .ToList()
+            : [];
+
+        var hasAudibleDelay = audiblePartitions.Count > 0;
+        var isUrgent = audiblePartitions.Any(p => p.ExitDelayUrgent);
+
+        if (hasAudibleDelay && (!_isBeeping || _wasUrgent != isUrgent))
+        {
+            try
+            {
+                if (!token.IsCancellationRequested)
+                {
+                    await JS.InvokeVoidAsync("exitDelayBeep.startBeeping", isUrgent);
+                    _isBeeping = true;
+                    _wasUrgent = isUrgent;
+                }
+            }
+            catch { }
+        }
+        else if (!hasAudibleDelay && _isBeeping)
+        {
+            try
+            {
+                if (!token.IsCancellationRequested)
+                {
+                    await JS.InvokeVoidAsync("exitDelayBeep.stopBeeping");
+                    _isBeeping = false;
+                    _wasUrgent = false;
+                }
+            }
+            catch { }
+        }
+    }
+
+    public void Dispose()
+    {
+        _cts.Cancel();
+        _refreshTimer?.Dispose();
+
+        PanelState.PartitionStateChanged -= OnPartitionStateChanged;
+        _cts.Dispose();
+    }
+}
