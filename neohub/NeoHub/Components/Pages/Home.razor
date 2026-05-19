@@ -416,23 +416,30 @@
 		};
 	}
 
-	private async Task ArmPartitionAsync(string sessionId, byte partition, ArmingMode mode)
-	{
-		commandInProgress = true;
-		StateHasChanged();
+private async Task ArmPartitionAsync(string sessionId, byte partition, ArmingMode mode)
+{
+    commandInProgress = true;
+    StateHasChanged();
 
-		try
-		{
-			var result = await CommandService.ArmAsync(sessionId, partition, mode);
-			if (!result.Success)
-				Snackbar.Add($"Arm failed: {result.ErrorMessage}", Severity.Error);
-		}
-		finally
-		{
-			commandInProgress = false;
-			StateHasChanged();
-		}
-	}
+    try
+    {
+        string? code = null;
+
+        if (mode == ArmingMode.ArmWithNoEntryDelay)
+        {
+            code = ConnectionSettings.CurrentValue.FindBySessionId(sessionId)?.DefaultAccessCode;
+        }
+
+        var result = await CommandService.ArmAsync(sessionId, partition, mode, code);
+        if (!result.Success)
+            Snackbar.Add($"Arm failed: {result.ErrorMessage}", Severity.Error);
+    }
+    finally
+    {
+        commandInProgress = false;
+        StateHasChanged();
+    }
+}
 
 	private void ShowDisarmDialog(string sessionId, byte partition)
 	{
