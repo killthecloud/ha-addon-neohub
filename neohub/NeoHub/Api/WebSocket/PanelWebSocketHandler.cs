@@ -146,8 +146,8 @@ namespace NeoHub.Api.WebSocket
                         await HandleArmCommandAsync(webSocket, armNight, DSC.TLink.ITv2.Enumerations.ArmingMode.NightArm, clientId);
                         break;
 
-                    case ArmHomeNoEntryDelayMessage armHomeNoEntryDelay:
-                        await HandleArmCommandAsync(webSocket, armHomeNoEntryDelay, DSC.TLink.ITv2.Enumerations.ArmingMode.StayNoEntryDelay, clientId);
+                    case ArmHomeNoEntryDelayMessage armStayNoEntryDelay:
+                        await HandleArmCommandAsync(webSocket, armStayNoEntryDelay, DSC.TLink.ITv2.Enumerations.ArmingMode.StayArmWithNoEntryDelay, clientId);
                         break;
 
                     case DisarmMessage disarm:
