@@ -13,6 +13,8 @@ A real-time web portal for monitoring and controlling DSC PowerSeries NEO alarm 
 
 ---
 
+## Personal Fork: Added No Entry Delay Arming option / button
+
 ## 🚀 Quick Start
 
 ### Docker Compose (Recommended)
