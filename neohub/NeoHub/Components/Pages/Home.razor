@@ -149,6 +149,14 @@
                                                    Disabled="@(!partition.IsReady || commandInProgress)">
                                             Night
                                         </MudButton>
+                                        <MudButton Variant="Variant.Outlined"
+                                                    Color="Color.Warning"
+                                                    Size="Size.Small"
+                                                    StartIcon="@Icons.Material.Filled.NoEncryption"
+                                                    OnClick="@(() => ArmPartitionAsync(sessionId, partitionNumber, ArmingMode.StayNoEntryDelay))"
+                                                    Disabled="@(!partition.IsReady || commandInProgress)">
+                                                Stay Instant
+                                            </MudButton>
                                     }
                                     <MudSpacer />
                                     <MudText Typo="Typo.caption" Color="Color.Secondary">
