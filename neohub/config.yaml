@@ -1,6 +1,6 @@
 name: NeoHub
 slug: neohub
-version: "0.1.4"
+version: "0.1.5"
 description: NeoHub for Home Assistant
 
 url: https://github.com/killthecloud/ha-addon-neohub
