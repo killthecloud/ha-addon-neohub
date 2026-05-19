@@ -153,9 +153,9 @@
                                                     Color="Color.Warning"
                                                     Size="Size.Small"
                                                     StartIcon="@Icons.Material.Filled.NoEncryption"
-                                                    OnClick="@(() => ArmPartitionAsync(sessionId, partitionNumber, ArmingMode.StayArmWithNoEntryDelay))"
+                                                    OnClick="@(() => ArmPartitionAsync(sessionId, partitionNumber, ArmingMode.ArmWithNoEntryDelay))"
                                                     Disabled="@(!partition.IsReady || commandInProgress)">
-                                                Stay Instant
+                                                No Entry Delay
                                             </MudButton>
                                     }
                                     <MudSpacer />
